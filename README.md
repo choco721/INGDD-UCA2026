@@ -1,6 +1,7 @@
 # Pipeline de datos VATSIM — grupo03
 
 **Ingeniería de Datos · LCD · UCA Rosario · 2026**
+**Chocobares Juan Cruz - Formenti Agustín - Ortiz Victoria - Morenico Andrés**
 
 Pipeline reproducible que ingesta tráfico aéreo simulado desde la API de VATSIM,
 lo transforma en capas con dbt y publica métricas de negocio en PostgreSQL para
@@ -281,71 +282,4 @@ sospechoso todo plan de vuelo que mantenga `groundspeed = 0` a lo largo de
 varios snapshots consecutivos. Implementarla requiere una serie más larga que la
 disponible al momento de la entrega.
 
-## 12. Preguntas de cierre
-
-**1. ¿Por qué Airflow no debería depender de la ejecución manual de un notebook?**
-
-Porque un notebook requiere que una persona abra el entorno y ejecute celdas en
-el orden correcto, lo que hace el proceso irreproducible y no automatizable.
-Además, el estado de un notebook depende del orden real de ejecución y no del
-orden visual de las celdas, así que el mismo archivo puede dar resultados
-distintos. Airflow necesita artefactos ejecutables de forma no interactiva, con
-código de salida verificable y logs que permitan diagnosticar fallas. Los
-notebooks quedan como evidencia del análisis; la lógica operativa vive en
-`scripts/` y en el proyecto dbt.
-
-**2. ¿Qué responsabilidad tiene `scripts/ingesta.py` y qué responsabilidad tiene la DAG?**
-
-`ingesta.py` contiene la lógica: leer la configuración, llamar a la API,
-validar la respuesta, normalizar los registros, aplicar el criterio incremental
-y escribir en bronze sin duplicar. Es autónomo y se puede probar solo.
-
-La DAG no contiene lógica de negocio: coordina. Define qué se ejecuta, en qué
-orden, con qué dependencias, cuántos reintentos y bajo qué condiciones. Si la
-DAG desapareciera, los scripts seguirían funcionando desde la terminal; esa es
-la prueba de que las responsabilidades están bien separadas.
-
-**3. ¿Qué parte del procesamiento corresponde a dbt y cuál no?**
-
-A dbt le corresponde la transformación dentro del warehouse: tipado, limpieza,
-deduplicado, cálculo de métricas y validación de calidad, todo expresado en SQL
-sobre datos que ya están disponibles.
-
-No le corresponde la extracción desde la API ni la escritura inicial en el lake
-(eso es ingesta, en Python), ni la publicación hacia PostgreSQL (eso es
-serving). dbt transforma lo que ya está; no trae ni entrega datos.
-
-**4. ¿Cómo garantiza el grupo que una segunda ejecución no duplica información?**
-
-Con las dos barreras descritas en la sección 6: el watermark sobre
-`snapshot_ts` evita volver a traer una foto ya ingerida, y el anti-join por la
-clave natural `(cid, snapshot_ts)` descarta lo que ya existe aunque el snapshot
-llegue repetido. La verificación está documentada: dos corridas consecutivas, la
-segunda devuelve 0 filas y código de salida 0.
-
-A esto se suma el test de unicidad en dbt, que falla si por cualquier motivo
-llegara a existir un duplicado en la capa staging.
-
-**5. ¿Qué prueba de dbt resultó más importante para los datos del grupo y por qué?**
-
-La unicidad de `(cid, snapshot_ts)`. Es la regla que un incidente de reingesta
-violó durante el simulacro, y es la que sostiene toda la capa de marts: las
-métricas se calculan con `count(distinct cid)` agrupando por snapshot, de modo
-que un duplicado inflaría el conteo de pilotos conectados y distorsionaría la
-variación porcentual sin que nada avisara.
-
-Mención aparte para el test de altitud, que fue valioso por el motivo opuesto:
-falló y al investigarlo resultó que la regla estaba mal planteada, no los datos.
-
-**6. ¿Qué información aporta el log de una tarea de Airflow cuando el pipeline falla?**
-
-El comando exacto que se ejecutó, la salida estándar y de error del proceso, el
-código de salida y el traceback completo cuando se trata de Python. Eso permite
-distinguir en qué capa está el problema: configuración, dependencias, acceso a
-datos o lógica.
-
-En este proyecto fue decisivo. El log nos llevó, en sucesivas iteraciones, desde
-un error de permisos del archivo `.env` hasta el `ModuleNotFoundError: No module
-named 'deltalake'`, que identificó la causa real como una dependencia ausente en
-la imagen del contenedor y no un problema del código del grupo. Sin el log
 habríamos estado modificando el pipeline a ciegas.
