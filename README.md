@@ -1,6 +1,8 @@
 # Pipeline de datos VATSIM — grupo03
 
 **Ingeniería de Datos · LCD · UCA Rosario · 2026**
+
+
 **Chocobares Juan Cruz - Formenti Agustín - Ortiz Victoria - Morenico Andrés**
 
 Pipeline reproducible que ingesta tráfico aéreo simulado desde la API de VATSIM,
