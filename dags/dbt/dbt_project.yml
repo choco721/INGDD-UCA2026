@@ -1,0 +1,20 @@
+name: 'proyecto_id'
+version: '1.0.0'
+config-version: 2
+profile: 'ingdatos'
+
+model-paths:  ["models"]
+test-paths:   ["tests"]
+target-path:  "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  proyecto_id:
+    # staging: limpieza y tipado, 1:1 con la fuente del lake.
+    # Se materializan como vistas: se recalculan y no ocupan espacio.
+    staging:
+      +materialized: view
+    # marts: modelos de negocio para consumo (BI, serving).
+    # Se materializan como tablas: lectura rapida, sin depender del lake.
+    marts:
+      +materialized: table

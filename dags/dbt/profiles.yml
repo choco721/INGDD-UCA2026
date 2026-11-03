@@ -1,0 +1,17 @@
+ingdatos:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH') }}"
+      extensions:
+        - httpfs
+        - delta
+      secrets:
+        - type: s3
+          key_id: "{{ env_var('AWS_ACCESS_KEY_ID') }}"
+          secret: "{{ env_var('AWS_SECRET_ACCESS_KEY') }}"
+          endpoint: "{{ env_var('DBT_S3_ENDPOINT') }}"
+          use_ssl: "{{ env_var('DBT_S3_USE_SSL') == 'true' }}"
+          url_style: path
+          region: us-east-1

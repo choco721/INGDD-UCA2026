@@ -26,3 +26,15 @@ Thumbs.db
 
 # --- Airflow ---
 logs/
+
+# --- Trabajo del grupo en el servidor de la catedra ---
+target/                     # dbt compila aca; se regenera con dbt build
+dbt_packages/               # dependencias de dbt, se bajan con dbt deps
+.runtime_grupo03/           # entorno virtual de Airflow (cientos de MB)
+*.tar.gz                    # respaldos comprimidos
+*.bak                       # respaldos de archivos editados por scripts
+.user.yml                   # configuracion local de JupyterHub
+
+# --- Trabajo del grupo en el servidor de la catedra ---
+
+# --- Trabajo del grupo en el servidor de la catedra ---
