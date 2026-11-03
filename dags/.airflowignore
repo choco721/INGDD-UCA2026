@@ -1,0 +1,9 @@
+# Archivos que NO son DAGs: Airflow no debe intentar parsearlos.
+# entorno.py y los scripts se importan en runtime via PYTHONPATH,
+# no son definiciones de DAG.
+entorno.py
+scripts
+dbt
+respaldos_dags
+
+.runtime_grupo03

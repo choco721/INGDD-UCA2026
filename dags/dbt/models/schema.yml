@@ -1,0 +1,139 @@
+version: 2
+
+sources:
+  - name: lake
+    description: "Data lake del grupo en MinIO/S3."
+    tables:
+      - name: vatsim
+        description: "Snapshots crudos de pilotos VATSIM en formato Delta."
+        meta:
+          external_location: "delta_scan('s3://{{ env_var('MINIO_BUCKET') }}/bronze/vatsim')"
+
+models:
+  - name: brz_vatsim
+    description: "Bronze: vista sobre los datos crudos de VATSIM."
+
+  - name: stg_vatsim
+    description: "Silver: datos tipados y deduplicados por cid y snapshot_ts."
+    columns:
+      - name: snapshot_sk
+        description: "Clave formada por cid y snapshot_ts."
+        tests: [not_null, unique]
+      - name: cid
+        description: "Identificador del piloto."
+        tests: [not_null]
+      - name: callsign
+        description: "Indicativo de vuelo."
+      - name: piloto
+        description: "Nombre declarado del piloto."
+      - name: server
+        description: "Servidor VATSIM."
+      - name: latitude
+        description: "Latitud en grados decimales."
+      - name: longitude
+        description: "Longitud en grados decimales."
+      - name: altitude_ft
+        description: "Altitud en pies; puede ser negativa en tierra."
+      - name: groundspeed_kt
+        description: "Velocidad respecto al suelo en nudos."
+      - name: heading
+        description: "Rumbo en grados."
+      - name: origen
+        description: "Aeropuerto de salida; nulo si no está informado."
+      - name: destino
+        description: "Aeropuerto de llegada; nulo si no está informado."
+      - name: aeronave
+        description: "Tipo de aeronave."
+      - name: snapshot_ts
+        description: "Fecha y hora del snapshot."
+        tests: [not_null]
+
+  - name: fct_trafico_snapshot
+    description: "Gold: métricas de tráfico por snapshot para Metabase."
+    columns:
+      - name: snapshot_ts
+        description: "Fecha y hora del snapshot; clave de la tabla."
+        tests: [not_null, unique]
+      - name: pilotos_conectados
+        description: "Cantidad de pilotos distintos conectados."
+        tests: [not_null]
+      - name: pilotos_sin_plan
+        description: "Pilotos cuyo aeropuerto de origen es nulo."
+      - name: aeropuertos_origen
+        description: "Cantidad de aeropuertos de salida distintos."
+      - name: aeropuertos_destino
+        description: "Cantidad de aeropuertos de llegada distintos."
+      - name: pilotos_previo
+        description: "Pilotos conectados en el snapshot anterior."
+      - name: var_pct_pilotos
+        description: "Variación porcentual respecto del snapshot anterior."
+
+  - name: fct_rutas
+    description: "Gold: vuelos por ruta (origen-destino) en cada snapshot."
+    columns:
+      - name: snapshot_ts
+        description: "Foto a la que corresponde el conteo."
+        tests: [not_null]
+      - name: origen
+        description: "Aeropuerto de salida declarado en el plan de vuelo."
+        tests: [not_null]
+      - name: destino
+        description: "Aeropuerto de llegada declarado en el plan de vuelo."
+        tests: [not_null]
+      - name: ruta
+        description: "Origen y destino concatenados, para mostrar en el tablero."
+      - name: vuelos
+        description: "Pilotos distintos volando esa ruta en el snapshot."
+        tests: [not_null]
+
+  - name: fct_aeronaves
+    description: "Gold: composicion de la flota por tipo de aeronave en cada snapshot."
+    columns:
+      - name: snapshot_ts
+        description: "Foto a la que corresponde el conteo."
+        tests: [not_null]
+      - name: aeronave
+        description: "Tipo de aeronave (codigo corto del plan de vuelo)."
+        tests: [not_null]
+      - name: vuelos
+        description: "Pilotos distintos con ese tipo de aeronave."
+        tests: [not_null]
+
+  - name: fct_posiciones
+    description: "Gold: posicion de cada piloto en el ultimo snapshot. Alimenta el mapa."
+    columns:
+      - name: snapshot_ts
+        description: "Foto de la que proviene la posicion."
+        tests: [not_null]
+      - name: cid
+        description: "Identificador del piloto. Unico dentro del snapshot."
+        tests: [not_null, unique]
+      - name: callsign
+        description: "Indicativo de vuelo."
+      - name: piloto
+        description: "Nombre del piloto declarado en la red."
+      - name: server
+        description: "Servidor de VATSIM al que esta conectado."
+      - name: latitude
+        description: "Latitud en grados decimales, para el mapa."
+        tests: [not_null]
+      - name: longitude
+        description: "Longitud en grados decimales, para el mapa."
+        tests: [not_null]
+      - name: altitude_ft
+        description: "Altitud en pies."
+      - name: groundspeed_kt
+        description: "Velocidad respecto al suelo en nudos."
+      - name: heading
+        description: "Rumbo en grados."
+      - name: origen
+        description: "Aeropuerto de salida declarado."
+      - name: destino
+        description: "Aeropuerto de llegada declarado."
+      - name: aeronave
+        description: "Tipo de aeronave."
+      - name: fase_vuelo
+        description: "Derivada de la altitud: En tierra, Ascenso o descenso, Crucero."
+        tests:
+          - accepted_values:
+              values: ['En tierra', 'Ascenso o descenso', 'Crucero', 'Sin dato']
