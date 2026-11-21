@@ -136,4 +136,5 @@ models:
         description: "Derivada de la altitud: En tierra, Ascenso o descenso, Crucero."
         tests:
           - accepted_values:
-              values: ['En tierra', 'Ascenso o descenso', 'Crucero', 'Sin dato']
+             arguments:
+               values: ['En tierra', 'Ascenso o descenso', 'Crucero', 'Sin dato']
