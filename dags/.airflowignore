@@ -7,3 +7,4 @@ dbt
 respaldos_dags
 
 .runtime_grupo03
+.ipynb_checkpoints

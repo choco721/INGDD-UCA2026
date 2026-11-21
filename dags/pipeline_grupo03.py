@@ -37,6 +37,8 @@ export DBT_DUCKDB_PATH="{RAIZ}/dbt/warehouse.duckdb"
 ENDPOINT="${{AWS_ENDPOINT_URL#http://}}"
 export DBT_S3_ENDPOINT="${{ENDPOINT#https://}}"
 export DBT_S3_USE_SSL=false
+export DBT_TARGET_PATH=/tmp/dbt_target_grupo03
+export DBT_LOG_PATH=/tmp/dbt_logs_grupo03
 """
 
 default_args = {
