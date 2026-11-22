@@ -15,3 +15,10 @@ ingdatos:
           use_ssl: "{{ env_var('DBT_S3_USE_SSL') == 'true' }}"
           url_style: path
           region: us-east-1
+
+    # Target del CI: una base DuckDB local y descartable, sin lake ni
+    # credenciales. Bronze se reemplaza por una muestra (ver ci/).
+    ci:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'ci.duckdb') }}"
+      threads: 1

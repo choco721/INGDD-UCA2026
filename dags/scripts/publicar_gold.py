@@ -22,6 +22,8 @@ ESQUEMA_POSTGRES = "grupo03"
 # Tablas de marts a publicar. El nombre es el mismo en DuckDB y en PostgreSQL.
 TABLAS = [
     "fct_trafico_snapshot",
+    "fct_trafico_diario",
+    "fct_features_trafico_diario",
     "fct_rutas",
     "fct_aeronaves",
     "fct_posiciones",
@@ -144,6 +146,11 @@ def publicar_gold() -> int:
         Total de filas publicadas en PostgreSQL.
     """
     print("=== PUBLICACION GOLD VATSIM ===")
+    faltantes = [v for v in ("PGHOST", "PGDATABASE", "PGUSER", "PGPASSWORD")
+                 if not os.getenv(v)]
+    if faltantes:
+        raise RuntimeError("Faltan variables de PostgreSQL: " + ", ".join(faltantes))
+
     print("Lectura desde DuckDB:")
     datos = leer_gold()
 

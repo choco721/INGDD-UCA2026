@@ -6,13 +6,15 @@ venv/
 .ipynb_checkpoints/
 
 # --- dbt ---
-dbt/target/
-dbt/dbt_packages/
-dbt/logs/
+# Git no admite comentarios al final de una regla: van siempre en su propia linea.
+target/
+dbt_packages/
+logs/
 *.duckdb
 *.duckdb.wal
+.user.yml
 
-# --- Datos: NO subir datos al repo. El lake vive en MinIO, no en git. ---
+# --- Datos: no se suben al repo. El lake vive en MinIO, no en git. ---
 seed/*.csv
 seed/*.parquet
 *.parquet
@@ -20,29 +22,15 @@ seed/*.parquet
 # --- Secretos: nunca subir credenciales reales ---
 .env
 
+# --- Trabajo del grupo en el servidor de la catedra ---
+# Entorno virtual de Airflow (cientos de MB): se reconstruye con preparar_entorno_grupo03.sh
+.runtime_grupo03/
+# Respaldos que dejan los scripts y el despliegue
+*.bak
+*.tar.gz
+respaldos_dags/
+respaldos_despliegue/
+
 # --- Sistema operativo ---
 .DS_Store
 Thumbs.db
-
-# --- Airflow ---
-logs/
-
-# --- Trabajo del grupo en el servidor de la catedra ---
-target/                     # dbt compila aca; se regenera con dbt build
-dbt_packages/               # dependencias de dbt, se bajan con dbt deps
-.runtime_grupo03/           # entorno virtual de Airflow (cientos de MB)
-*.tar.gz                    # respaldos comprimidos
-*.bak                       # respaldos de archivos editados por scripts
-.user.yml                   # configuracion local de JupyterHub
-
-# --- Trabajo del grupo en el servidor de la catedra ---
-
-# --- Trabajo del grupo en el servidor de la catedra ---
-
-# --- Trabajo del grupo en el servidor de la catedra ---
-target/                     # dbt compila aca; se regenera con dbt build
-dbt_packages/               # dependencias de dbt, se bajan con dbt deps
-.runtime_grupo03/           # entorno virtual de Airflow (cientos de MB)
-*.tar.gz                    # respaldos comprimidos
-*.bak                       # respaldos de archivos editados por scripts
-.user.yml                   # configuracion local de JupyterHub

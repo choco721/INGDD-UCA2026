@@ -47,13 +47,17 @@ SEED     = os.environ.get("SEED_PATH", os.path.join(BASE, "seed", "bcra_series_h
 DBT_DIR  = os.environ.get("DBT_DIR",   os.path.join(BASE, "dbt"))
 DAGS_DIR = os.environ.get("DAGS_DIR",  os.path.join(BASE, "dags"))
 
+# Las credenciales no tienen valor por defecto: vienen siempre del entorno o
+# del .env (ver .env.example). Si faltan, quedan vacias y el script que las
+# usa corta con un mensaje claro, en vez de intentar con una clave inventada.
+
 # ---- Object storage (MinIO / S3) ----
 BUCKET = os.environ.get("MINIO_BUCKET", "lake")        # servidor: grupoNN · local: lake
 BRONZE = f"s3://{BUCKET}/bronze/series"
 SILVER = f"s3://{BUCKET}/silver"
 STORAGE_OPTIONS = {
-    "AWS_ACCESS_KEY_ID":     os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin"),
-    "AWS_SECRET_ACCESS_KEY": os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+    "AWS_ACCESS_KEY_ID":     os.environ.get("AWS_ACCESS_KEY_ID", ""),
+    "AWS_SECRET_ACCESS_KEY": os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
     "AWS_ENDPOINT_URL":      os.environ.get("AWS_ENDPOINT_URL", "http://minio:9000"),
     "AWS_ALLOW_HTTP":        "true",
     "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
@@ -64,8 +68,8 @@ PG = {
     "host":     os.environ.get("PGHOST", "postgres"),
     "port":     os.environ.get("PGPORT", "5432"),
     "dbname":   os.environ.get("PGDATABASE", "gold"),    # servidor: warehouse · local: gold
-    "user":     os.environ.get("PGUSER", "airflow"),     # servidor: grupoNN · local: airflow
-    "password": os.environ.get("PGPASSWORD", "airflow"),
+    "user":     os.environ.get("PGUSER", ""),            # servidor: grupoNN
+    "password": os.environ.get("PGPASSWORD", ""),
 }
 
 

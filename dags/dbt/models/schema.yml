@@ -2,130 +2,206 @@ version: 2
 
 sources:
   - name: lake
-    description: "Data lake del grupo en MinIO/S3."
+    description: "Data lake del grupo en MinIO (S3), formato Delta Lake."
     tables:
       - name: vatsim
-        description: "Snapshots crudos de pilotos VATSIM en formato Delta."
+        description: >
+          Fotos crudas de los pilotos conectados a la red VATSIM, una por
+          corrida de la ingesta. Todo llega como texto, tal cual lo devolvio
+          la API, mas dos columnas de trazabilidad (_ingested_at, _run_id).
         meta:
           external_location: "delta_scan('s3://{{ env_var('MINIO_BUCKET') }}/bronze/vatsim')"
 
 models:
+  # ---------------------------------------------------------------- staging
   - name: brz_vatsim
-    description: "Bronze: vista sobre los datos crudos de VATSIM."
+    description: >
+      Bronze expuesto a dbt. Una vista sobre la tabla Delta, sin transformar:
+      es el punto de entrada unico al lake para el resto del proyecto.
 
   - name: stg_vatsim
-    description: "Silver: datos tipados y deduplicados por cid y snapshot_ts."
+    description: >
+      Silver. Un piloto conectado en un momento dado (una foto). Tipa cada
+      campo, convierte en nulo el plan de vuelo vacio, descarta filas sin
+      piloto o sin foto, y deja una sola fila por piloto y foto.
     columns:
       - name: snapshot_sk
-        description: "Clave formada por cid y snapshot_ts."
+        description: "Clave de la fila: piloto y foto. No puede repetirse."
         tests: [not_null, unique]
       - name: cid
-        description: "Identificador del piloto."
+        description: >
+          Numero de socio del piloto en VATSIM. Identifica a una persona: es
+          un dato personal y no se publica en gold.
         tests: [not_null]
       - name: callsign
-        description: "Indicativo de vuelo."
+        description: "Indicativo del vuelo (ej. AAL5644). Publico: es lo que se transmite por radio."
       - name: piloto
-        description: "Nombre declarado del piloto."
+        description: >
+          Nombre que el piloto declara al conectarse; muchas veces es su
+          nombre real. Dato personal: queda en silver y no se publica.
       - name: server
-        description: "Servidor VATSIM."
+        description: "Servidor de la red al que se conecto el piloto."
       - name: latitude
-        description: "Latitud en grados decimales."
+        description: "Latitud de la aeronave, en grados decimales."
       - name: longitude
-        description: "Longitud en grados decimales."
+        description: "Longitud de la aeronave, en grados decimales."
       - name: altitude_ft
-        description: "Altitud en pies; puede ser negativa en tierra."
+        description: >
+          Altitud en pies sobre el nivel del mar. Puede ser levemente negativa
+          con el avion en tierra (aeropuertos bajo el nivel del mar o ajuste
+          de presion).
       - name: groundspeed_kt
-        description: "Velocidad respecto al suelo en nudos."
+        description: "Velocidad respecto del suelo, en nudos."
       - name: heading
-        description: "Rumbo en grados."
+        description: "Rumbo de la aeronave, en grados (0 a 359)."
       - name: origen
-        description: "Aeropuerto de salida; nulo si no está informado."
+        description: "Codigo OACI del aeropuerto de salida. Nulo si el piloto no cargo plan de vuelo."
       - name: destino
-        description: "Aeropuerto de llegada; nulo si no está informado."
+        description: "Codigo OACI del aeropuerto de llegada. Nulo si no hay plan de vuelo."
       - name: aeronave
-        description: "Tipo de aeronave."
+        description: "Tipo de aeronave en codigo OACI corto (ej. A320, B738)."
       - name: snapshot_ts
-        description: "Fecha y hora del snapshot."
+        description: "Momento de la foto, en UTC, segun la propia API."
         tests: [not_null]
 
+  # ------------------------------------------------------------------ marts
   - name: fct_trafico_snapshot
-    description: "Gold: métricas de tráfico por snapshot para Metabase."
+    description: >
+      Gold. Responde: ¿cuanta gente esta volando en cada foto y como cambia
+      respecto de la foto anterior? Una fila por foto.
     columns:
       - name: snapshot_ts
-        description: "Fecha y hora del snapshot; clave de la tabla."
+        description: "Momento de la foto, en UTC."
         tests: [not_null, unique]
       - name: pilotos_conectados
-        description: "Cantidad de pilotos distintos conectados."
+        description: "Pilotos distintos conectados en esa foto."
         tests: [not_null]
       - name: pilotos_sin_plan
-        description: "Pilotos cuyo aeropuerto de origen es nulo."
+        description: "Pilotos conectados sin plan de vuelo cargado (sin aeropuerto de salida)."
       - name: aeropuertos_origen
-        description: "Cantidad de aeropuertos de salida distintos."
+        description: "Cantidad de aeropuertos distintos desde los que sale al menos un vuelo."
       - name: aeropuertos_destino
-        description: "Cantidad de aeropuertos de llegada distintos."
+        description: "Cantidad de aeropuertos distintos a los que llega al menos un vuelo."
       - name: pilotos_previo
-        description: "Pilotos conectados en el snapshot anterior."
+        description: "Pilotos conectados en la foto anterior."
       - name: var_pct_pilotos
-        description: "Variación porcentual respecto del snapshot anterior."
+        description: "Variacion porcentual de pilotos conectados contra la foto anterior."
+
+  - name: fct_trafico_diario
+    description: >
+      Gold. Responde: ¿cuantos pilotos vuelan por dia en VATSIM? Una fila por
+      dia en hora de Argentina. Es el modelo que se reprocesa por intervalo
+      en un backfill.
+    columns:
+      - name: fecha
+        description: "Dia, en hora de Argentina."
+        tests: [not_null, unique]
+      - name: snapshots_del_dia
+        description: "Cantidad de fotos tomadas ese dia. Normalmente una, a las 18:00."
+      - name: pilotos_promedio
+        description: "Promedio de pilotos conectados en las fotos del dia."
+        tests: [not_null]
+      - name: pilotos_maximo
+        description: "Mayor cantidad de pilotos conectados en una foto del dia."
+      - name: pilotos_minimo
+        description: "Menor cantidad de pilotos conectados en una foto del dia."
+      - name: pilotos_sin_plan_promedio
+        description: "Promedio de pilotos sin plan de vuelo en las fotos del dia."
+      - name: primera_foto_utc
+        description: "Hora UTC de la primera foto del dia."
+      - name: ultima_foto_utc
+        description: "Hora UTC de la ultima foto del dia."
+
+  - name: fct_features_trafico_diario
+    description: >
+      Gold. Features del trafico diario, para que un modelo pueda predecir el
+      trafico de manana. Cada valor usa solo informacion disponible al cierre
+      de su dia. Definidos una unica vez, aca.
+    columns:
+      - name: fecha
+        description: "Dia al que corresponden los features, en hora de Argentina."
+        tests: [not_null, unique]
+      - name: pilotos_promedio
+        description: "Promedio de pilotos conectados ese dia (la variable base)."
+        tests: [not_null]
+      - name: pilotos_media_movil_7d
+        description: "Promedio de pilotos de los ultimos 7 dias de calendario, incluido el dia."
+        tests: [not_null]
+      - name: dias_con_dato_7d
+        description: >
+          Cuantos de esos 7 dias tuvieron datos. Si es bajo, la media movil se
+          apoya en pocos dias (por ejemplo, despues de una caida del pipeline).
+      - name: pilotos_dia_anterior
+        description: "Promedio de pilotos del dia anterior. Nulo si ese dia no hubo datos."
+      - name: var_pct_vs_dia_anterior
+        description: "Variacion porcentual contra el dia anterior. Nula si no hay dia anterior."
+      - name: desvio_vs_media_7d
+        description: "Cuantos pilotos por encima (+) o por debajo (-) de la media de 7 dias esta el dia."
 
   - name: fct_rutas
-    description: "Gold: vuelos por ruta (origen-destino) en cada snapshot."
+    description: >
+      Gold. Responde: ¿cuales son las rutas mas voladas? Una fila por foto y
+      par de aeropuertos.
     columns:
       - name: snapshot_ts
         description: "Foto a la que corresponde el conteo."
         tests: [not_null]
       - name: origen
-        description: "Aeropuerto de salida declarado en el plan de vuelo."
+        description: "Aeropuerto de salida (codigo OACI)."
         tests: [not_null]
       - name: destino
-        description: "Aeropuerto de llegada declarado en el plan de vuelo."
+        description: "Aeropuerto de llegada (codigo OACI)."
         tests: [not_null]
       - name: ruta
-        description: "Origen y destino concatenados, para mostrar en el tablero."
+        description: "Ruta escrita como 'ORIGEN -> DESTINO', para mostrar en el tablero."
       - name: vuelos
-        description: "Pilotos distintos volando esa ruta en el snapshot."
+        description: "Vuelos distintos en esa ruta en esa foto."
         tests: [not_null]
 
   - name: fct_aeronaves
-    description: "Gold: composicion de la flota por tipo de aeronave en cada snapshot."
+    description: >
+      Gold. Responde: ¿que aviones se vuelan mas en la red? Una fila por foto
+      y tipo de aeronave.
     columns:
       - name: snapshot_ts
         description: "Foto a la que corresponde el conteo."
         tests: [not_null]
       - name: aeronave
-        description: "Tipo de aeronave (codigo corto del plan de vuelo)."
+        description: "Tipo de aeronave (codigo OACI corto)."
         tests: [not_null]
       - name: vuelos
-        description: "Pilotos distintos con ese tipo de aeronave."
+        description: "Vuelos distintos con ese tipo de aeronave."
         tests: [not_null]
+      - name: altitud_media_ft
+        description: "Altitud promedio de ese tipo de aeronave en la foto, en pies."
+      - name: velocidad_media_kt
+        description: "Velocidad promedio respecto del suelo de ese tipo, en nudos."
 
   - name: fct_posiciones
-    description: "Gold: posicion de cada piloto en el ultimo snapshot. Alimenta el mapa."
+    description: >
+      Gold. Responde: ¿donde esta volando la gente ahora mismo? Una fila por
+      vuelo de la ultima foto. Alimenta el mapa. Sin datos personales.
     columns:
       - name: snapshot_ts
         description: "Foto de la que proviene la posicion."
         tests: [not_null]
-      - name: cid
-        description: "Identificador del piloto. Unico dentro del snapshot."
-        tests: [not_null, unique]
       - name: callsign
-        description: "Indicativo de vuelo."
-      - name: piloto
-        description: "Nombre del piloto declarado en la red."
+        description: "Indicativo del vuelo. VATSIM no admite dos conectados con el mismo."
+        tests: [not_null, unique]
       - name: server
-        description: "Servidor de VATSIM al que esta conectado."
+        description: "Servidor de la red al que esta conectado."
       - name: latitude
-        description: "Latitud en grados decimales, para el mapa."
+        description: "Latitud, en grados decimales."
         tests: [not_null]
       - name: longitude
-        description: "Longitud en grados decimales, para el mapa."
+        description: "Longitud, en grados decimales."
         tests: [not_null]
       - name: altitude_ft
         description: "Altitud en pies."
       - name: groundspeed_kt
-        description: "Velocidad respecto al suelo en nudos."
+        description: "Velocidad respecto del suelo, en nudos."
       - name: heading
-        description: "Rumbo en grados."
+        description: "Rumbo, en grados."
       - name: origen
         description: "Aeropuerto de salida declarado."
       - name: destino
@@ -133,8 +209,10 @@ models:
       - name: aeronave
         description: "Tipo de aeronave."
       - name: fase_vuelo
-        description: "Derivada de la altitud: En tierra, Ascenso o descenso, Crucero."
+        description: >
+          Fase estimada a partir de la altitud: En tierra (menos de 1.000 ft),
+          Ascenso o descenso (hasta 18.000 ft) o Crucero. Sin dato si no hay altitud.
         tests:
           - accepted_values:
-             arguments:
-               values: ['En tierra', 'Ascenso o descenso', 'Crucero', 'Sin dato']
+              arguments:
+                values: ['En tierra', 'Ascenso o descenso', 'Crucero', 'Sin dato']
