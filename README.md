@@ -17,7 +17,6 @@ la cátedra, y cada cambio pasa por un CI en GitHub Actions.
 | E2 · dbt y calidad | [docs/entregas/E2_dbt.md](docs/entregas/E2_dbt.md) |
 | E3 · Airflow y CI | [docs/entregas/E3_orquestacion_ci.md](docs/entregas/E3_orquestacion_ci.md) |
 | E4 · Serving, features, governance | [docs/entregas/E4_serving_features_governance.md](docs/entregas/E4_serving_features_governance.md) |
-| Defensa | [docs/entregas/Defensa.md](docs/entregas/Defensa.md) |
 
 El código del grupo está en `dags/`. Las carpetas `dbt/`, `scripts/`, `docker/`
 de la raíz y `docker-compose.yml` son el stack de ejemplo de la cátedra.
