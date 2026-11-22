@@ -42,7 +42,6 @@ CI: .github/workflows/ci.yml  (DAG + dbt build contra una muestra)
 | E4 · Serving, features, governance | [docs/entregas/E4_serving_features_governance.md](docs/entregas/E4_serving_features_governance.md) |
 | Governance del dataset | [docs/governance/governance_vatsim.md](docs/governance/governance_vatsim.md) |
 | Tablero: preguntas y SQL | [docs/tablero/preguntas_tablero.md](docs/tablero/preguntas_tablero.md) |
-| Defensa: plan de demostración | [docs/entregas/Defensa.md](docs/entregas/Defensa.md) |
 
 ## Estructura del repositorio
 
