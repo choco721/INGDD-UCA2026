@@ -1,17 +1,20 @@
--- Gold: posicion de cada piloto en el snapshot mas reciente.
--- Grano: una fila por piloto (cid) del ultimo snapshot disponible.
+-- Gold: posicion de cada vuelo en el snapshot mas reciente.
+-- Grano: una fila por callsign del ultimo snapshot disponible.
 -- Alimenta el mapa de Metabase y el analisis por fase de vuelo.
+--
 -- Se limita al ultimo snapshot a proposito: es una foto del momento, no una
 -- serie historica, y asi la tabla se mantiene chica para el tablero.
+--
+-- No publica el nombre del piloto ni su cid: son datos personales y el
+-- tablero no los necesita (ver docs/governance). El callsign es el
+-- identificador publico del vuelo, el mismo que muestra cualquier radar.
 with ultimo as (
     select max(snapshot_ts) as snapshot_ts
     from {{ ref('stg_vatsim') }}
 )
 select
     s.snapshot_ts,
-    s.cid,
     s.callsign,
-    s.piloto,
     s.server,
     s.latitude,
     s.longitude,

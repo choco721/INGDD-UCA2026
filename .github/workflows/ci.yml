@@ -1,0 +1,59 @@
+# CI del pipeline VATSIM — grupo03
+#
+# Corre en cada push y en cada pull request. Dos trabajos en paralelo:
+#   1. dag: el DAG importa, esta bien encadenado y sus templates renderizan.
+#   2. dbt: el SQL es valido y todos los tests de dbt pasan.
+#
+# No usa el lake ni credenciales: dbt corre contra una base DuckDB
+# descartable y una muestra de bronze con la misma forma que la real
+# (dags/dbt/ci/). Para que el CI bloquee de verdad, la rama main tiene que
+# exigir que estos dos trabajos pasen antes de mergear (ver E3_orquestacion_ci.md).
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  dag:
+    name: DAG importa y esta bien armado
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar Airflow 2.10.5
+        run: >
+          pip install "apache-airflow==2.10.5"
+          --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.11.txt"
+      - name: Verificar el DAG
+        env:
+          AIRFLOW_HOME: ${{ runner.temp }}/airflow
+          AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+        run: python ci/test_dag.py
+
+  dbt:
+    name: SQL valido y tests de dbt en verde
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: dags/dbt
+    env:
+      MINIO_BUCKET: ci
+      DBT_DUCKDB_PATH: ci.duckdb
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar dbt con las mismas versiones que el servidor
+        run: pip install $(grep -E '^(dbt-duckdb|duckdb)==' ../requirements_grupo03.txt)
+      - name: Validar el proyecto (YAML, Jinja, refs)
+        run: dbt parse --profiles-dir . --target ci --vars '{bronze_csv: ci/vatsim_bronze_muestra.csv}'
+      - name: Construir y testear contra la muestra de bronze
+        run: dbt build --profiles-dir . --target ci --vars '{bronze_csv: ci/vatsim_bronze_muestra.csv}'

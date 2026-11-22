@@ -41,8 +41,29 @@ export DBT_TARGET_PATH=/tmp/dbt_target_grupo03
 export DBT_LOG_PATH=/tmp/dbt_logs_grupo03
 """
 
+# Intervalo de la corrida, tomado del contexto de Airflow (nunca del reloj).
+# En un backfill, estos valores son los del periodo pasado que se reprocesa.
+INTERVALO_ISO = (
+    '--inicio "{{ data_interval_start.isoformat() }}" '
+    '--fin "{{ data_interval_end.isoformat() }}"'
+)
+
+# Dias a reconstruir en la serie diaria: del dia en que empieza el intervalo
+# al dia en que termina, en hora de Argentina. Incluir el dia de inicio
+# reprocesa fotos tomadas despues de la corrida anterior (ej. una ingesta
+# manual). Es idempotente: delete+insert por fecha.
+VARS_DBT = (
+    "--vars '{"
+    "\"desde\": \"{{ data_interval_start.in_timezone('America/Argentina/Cordoba').strftime('%Y-%m-%d') }}\", "
+    "\"hasta\": \"{{ data_interval_end.in_timezone('America/Argentina/Cordoba').strftime('%Y-%m-%d') }}\""
+    "}'"
+)
+
 default_args = {
     "owner": "grupo03",
+    # Dos reintentos espaciados cubren un corte de la API o de MinIO de unos
+    # minutos. Mas que eso esconderia un problema real. Es seguro reintentar
+    # porque cada tarea es idempotente.
     "retries": 2,
     "retry_delay": pendulum.duration(minutes=1),
 }
@@ -50,7 +71,8 @@ default_args = {
 with DAG(
     dag_id="pipeline_grupo03",
     description="Pipeline VATSIM: bronze -> silver -> gold -> PostgreSQL",
-    start_date=pendulum.datetime(2026, 1, 1, tz="America/Argentina/Cordoba"),
+    # Primera ingesta real: antes de esta fecha no hay datos que reprocesar.
+    start_date=pendulum.datetime(2026, 10, 22, tz="America/Argentina/Cordoba"),
     schedule="0 18 * * *",  # diario a las 18:00 (hora del start_date): mantiene
                             # constante la hora de observacion entre dias
     catchup=False,
@@ -68,16 +90,14 @@ with DAG(
         task_id="ingerir_bronze",
         bash_command=PREPARAR_ENTORNO + """
 echo "--- Ingesta incremental de VATSIM hacia bronze ---"
-python -m scripts.ingesta
-""",
+python -m scripts.ingesta """ + INTERVALO_ISO + "\n",
     )
 
     construir = BashOperator(
         task_id="dbt_run",
         bash_command=PREPARAR_ENTORNO + PREPARAR_DBT + f"""
 echo "--- Construccion de los modelos silver y gold ---"
-dbt run --project-dir {RAIZ}/dbt --profiles-dir {RAIZ}/dbt
-""",
+dbt run --project-dir {RAIZ}/dbt --profiles-dir {RAIZ}/dbt """ + VARS_DBT + "\n",
     )
 
     validar = BashOperator(
