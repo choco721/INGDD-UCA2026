@@ -54,6 +54,12 @@ jobs:
       - name: Instalar dbt con las mismas versiones que el servidor
         run: pip install $(grep -E '^(dbt-duckdb|duckdb)==' ../requirements_grupo03.txt)
       - name: Validar el proyecto (YAML, Jinja, refs)
-        run: dbt parse --profiles-dir . --target ci --vars '{bronze_csv: ci/vatsim_bronze_muestra.csv}'
+        # Bloque literal (|): el comando tiene ': ' adentro, y sin esto YAML lo
+        # interpreta como otro campo y GitHub no puede leer el workflow.
+        run: |
+          dbt parse --profiles-dir . --target ci --vars '{bronze_csv: ci/vatsim_bronze_muestra.csv}'
       - name: Construir y testear contra la muestra de bronze
-        run: dbt build --profiles-dir . --target ci --vars '{bronze_csv: ci/vatsim_bronze_muestra.csv}'
+        # Bloque literal (|): el comando tiene ': ' adentro, y sin esto YAML lo
+        # interpreta como otro campo y GitHub no puede leer el workflow.
+        run: |
+          dbt build --profiles-dir . --target ci --vars '{bronze_csv: ci/vatsim_bronze_muestra.csv}'
