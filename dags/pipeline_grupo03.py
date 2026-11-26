@@ -41,11 +41,22 @@ export DBT_TARGET_PATH=/tmp/dbt_target_grupo03
 export DBT_LOG_PATH=/tmp/dbt_logs_grupo03
 """
 
-# Intervalo de la corrida, tomado del contexto de Airflow (nunca del reloj).
-# En un backfill, estos valores son los del periodo pasado que se reprocesa.
+# Fin del intervalo de la corrida, tomado del contexto de Airflow (nunca del
+# reloj). En una corrida programada o un backfill es data_interval_end. En una
+# corrida manual (Trigger DAG), Airflow asigna el ultimo intervalo programado
+# ya cerrado, que termina antes del momento del disparo: la foto actual de
+# VATSIM quedaria fuera y la ingesta no traeria nada. Por eso en ese caso se
+# usa logical_date, que en una corrida manual es el momento del disparo.
+FIN = (
+    "(logical_date if dag_run is defined and dag_run.run_type == 'manual' "
+    "else data_interval_end)"
+)
+
+# Intervalo de la corrida. En un backfill, estos valores son los del periodo
+# pasado que se reprocesa.
 INTERVALO_ISO = (
     '--inicio "{{ data_interval_start.isoformat() }}" '
-    '--fin "{{ data_interval_end.isoformat() }}"'
+    '--fin "{{ ' + FIN + '.isoformat() }}"'
 )
 
 # Dias a reconstruir en la serie diaria: del dia en que empieza el intervalo
@@ -55,7 +66,7 @@ INTERVALO_ISO = (
 VARS_DBT = (
     "--vars '{"
     "\"desde\": \"{{ data_interval_start.in_timezone('America/Argentina/Cordoba').strftime('%Y-%m-%d') }}\", "
-    "\"hasta\": \"{{ data_interval_end.in_timezone('America/Argentina/Cordoba').strftime('%Y-%m-%d') }}\""
+    "\"hasta\": \"{{ " + FIN + ".in_timezone('America/Argentina/Cordoba').strftime('%Y-%m-%d') }}\""
     "}'"
 )
 
