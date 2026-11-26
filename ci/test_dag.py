@@ -58,6 +58,21 @@ def main() -> None:
                 data_interval_start=inicio, data_interval_end=fin):
             errores.append("dbt no recibe el rango de dias de la corrida")
 
+        # Corrida manual: Airflow asigna el ultimo intervalo cerrado, pero el
+        # fin tiene que ser el momento del disparo (logical_date) para que la
+        # ingesta acepte la foto actual y dbt reconstruya el dia de hoy.
+        class CorridaManual:
+            run_type = "manual"
+
+        disparo = fin.add(hours=17)  # 2026-11-11 14:00 UTC
+        ctx_manual = dict(data_interval_start=inicio, data_interval_end=fin,
+                          logical_date=disparo, dag_run=CorridaManual())
+        if '--fin "2026-11-11T14:00:00+00:00"' not in ingesta.render(**ctx_manual):
+            errores.append("una corrida manual no usa el momento del disparo "
+                           "como fin del intervalo")
+        if '"hasta": "2026-11-11"' not in dbt.render(**ctx_manual):
+            errores.append("una corrida manual no reconstruye el dia del disparo")
+
     if errores:
         print("CI ROJO:", *errores, sep="\n  - ")
         sys.exit(1)
